@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Controle de Estudos</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="cabecalho">
+        <div class="container cabecalho-conteudo">
+            <div>
+            <p class="eyebrow">Organização acadêmica</p>
+            <h1>Sistema de Controle de Estudos</h1>
+            <p class="subtitulo">Cadastre suas disciplinas, acompanhe as horas estudadas e mantenha tudo salvo no navegador.</p>
+            </div>
+            <button id="botao-tema" class="botao-tema" type="button" aria-label="Ativar tema escuro" title="Ativar tema escuro">🌙 <span>Tema escuro</span></button>
+        </div>
+    </header>
+
+    <main class="container principal">
+        <section class="painel cadastro" aria-labelledby="titulo-cadastro">
+            <div class="titulo-secao">
+                <div>
+                    <h2 id="titulo-cadastro">Cadastrar disciplina</h2>
+                </div>
+            </div>
+
+            <form id="form-disciplina" novalidate>
+                <div class="campo">
+                    <label for="nome-disciplina">Nome da disciplina</label>
+                    <input
+                        id="nome-disciplina"
+                        name="nome"
+                        type="text"
+                        placeholder="Ex.: Programação"
+                        maxlength="80"
+                        autocomplete="off"
+                        required
+                    >
+                </div>
+
+                <div class="campo">
+                    <label for="horas-estudadas">Horas estudadas</label>
+                    <input
+                        id="horas-estudadas"
+                        name="horas"
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        placeholder="Ex.: 10"
+                        required
+                    >
+                </div>
+
+                <button class="botao botao-principal" type="submit">Adicionar disciplina</button>
+                <p id="mensagem-form" class="mensagem" role="alert" aria-live="polite"></p>
+            </form>
+        </section>
+
+        <section class="resumo" aria-label="Resumo dos estudos">
+            <article class="estatistica">
+                <span class="rotulo-estatistica">Disciplinas</span>
+                <strong id="total-disciplinas">0</strong>
+            </article>
+            <article class="estatistica">
+                <span class="rotulo-estatistica">Concluídas</span>
+                <strong id="total-concluidas">0</strong>
+            </article>
+            <article class="estatistica">
+                <span class="rotulo-estatistica">Horas estudadas</span>
+                <strong id="total-horas">0h</strong>
+            </article>
+        </section>
+
+        <section class="painel lista" aria-labelledby="titulo-lista">
+            <div class="cabecalho-lista">
+                <div>
+                    <h2 id="titulo-lista">Minhas disciplinas</h2>
+                </div>
+                <span id="contador-status" class="contador-status">0 disciplinas</span>
+            </div>
+
+            <div id="lista-disciplinas" class="lista-disciplinas" aria-live="polite"></div>
+
+            <div id="estado-vazio" class="estado-vazio">
+                <div class="icone-vazio" aria-hidden="true">✓</div>
+                <h3>Nenhuma disciplina cadastrada</h3>
+                <p>Adicione a primeira disciplina acima para começar seu controle de estudos.</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
