@@ -3,11 +3,23 @@
 // ================================================================
 // Persistência: localStorage + JSON.stringify() + JSON.parse()
 // Estrutura principal: array de objetos.
+//
+// Regra do cronômetro:
+// - cada disciplina pode ter seu próprio cronômetro;
+// - somente um cronômetro fica ativo por vez;
+// - horasPlanejadas guarda a meta informada no cadastro;
+// - ao parar, o tempo real medido é salvo em horasEstudadas;
+// - a disciplina NÃO é concluída automaticamente ao parar o cronômetro.
 
 const CHAVE_STORAGE = "disciplinas";
+const CHAVE_TEMA = "temaEstudos";
 
 // Array de objetos: cada item representa uma disciplina.
 let disciplinas = [];
+
+// Estado do cronômetro em memória.
+let cronometroAtivo = null;
+let intervaloCronometro = null;
 
 const formDisciplina = document.getElementById("form-disciplina");
 const nomeDisciplina = document.getElementById("nome-disciplina");
@@ -25,7 +37,7 @@ const botaoTema = document.getElementById("botao-tema");
 // TEMA
 // ================================================================
 function aplicarTema() {
-    const temaSalvo = localStorage.getItem("temaEstudos");
+    const temaSalvo = localStorage.getItem(CHAVE_TEMA);
     const temaEscuro = temaSalvo === "escuro";
 
     document.body.classList.toggle("tema-escuro", temaEscuro);
@@ -41,7 +53,7 @@ function alternarTema() {
 
     document.body.classList.toggle("tema-escuro", temaEscuro);
     document.documentElement.classList.toggle("tema-escuro", temaEscuro);
-    localStorage.setItem("temaEstudos", novoTema);
+    localStorage.setItem(CHAVE_TEMA, novoTema);
     aplicarTema();
 }
 
@@ -67,6 +79,26 @@ function carregarDisciplinas() {
         disciplinas = Array.isArray(dadosConvertidos)
             ? dadosConvertidos
             : [];
+
+        // Garante a separação entre tempo planejado e tempo realmente estudado.
+        // Registros antigos que não possuíam essa separação usam horasEstudadas como
+        // referência planejada e começam o estudo real em 00:00:00.
+        disciplinas = disciplinas.map(function (disciplina) {
+            const tempoCronometro = Number(disciplina.tempoCronometroSegundos) || 0;
+            const possuiTempoPlanejado = disciplina.horasPlanejadas !== undefined;
+
+            return {
+                ...disciplina,
+                horasPlanejadas: possuiTempoPlanejado
+                    ? Number(disciplina.horasPlanejadas) || 0
+                    : Number(disciplina.horasEstudadas) || 0,
+                horasEstudadas: possuiTempoPlanejado
+                    ? Number(disciplina.horasEstudadas) || 0
+                    : (tempoCronometro > 0 ? Number((tempoCronometro / 3600).toFixed(4)) : 0),
+                tempoCronometroSegundos: tempoCronometro,
+                concluida: Boolean(disciplina.concluida)
+            };
+        });
     } catch (erro) {
         // Se houver JSON inválido, a aplicação continua utilizável.
         disciplinas = [];
@@ -91,17 +123,17 @@ function validarDados(nome, horas) {
     }
 
     if (horas === "") {
-        return "Informe a quantidade de horas estudadas.";
+        return "Informe o tempo planejado de estudo.";
     }
 
     const horasNumero = Number(horas);
 
     if (!Number.isFinite(horasNumero)) {
-        return "As horas estudadas devem ser um número.";
+        return "O tempo planejado deve ser um número.";
     }
 
     if (horasNumero < 0) {
-        return "As horas estudadas não podem ser negativas.";
+        return "O tempo planejado não pode ser negativo.";
     }
 
     return "";
@@ -122,10 +154,12 @@ function adicionarDisciplina(evento) {
         return;
     }
 
-    // Cria um objeto com exatamente os dados exigidos pelo exercício.
+    // Cria um objeto com os dados exigidos pelo exercício.
     const novaDisciplina = {
         nome: nome,
-        horasEstudadas: Number(horas),
+        horasPlanejadas: Number(horas),
+        horasEstudadas: 0,
+        tempoCronometroSegundos: 0,
         concluida: false
     };
 
@@ -151,10 +185,16 @@ function alterarConclusao(indice) {
         return;
     }
 
+    // Se a disciplina estiver sendo concluída enquanto o cronômetro está rodando,
+    // primeiro registra o tempo já estudado e só depois fecha a tarefa.
+    if (!disciplina.concluida && cronometroAtivo && cronometroAtivo.indice === indice) {
+        pararCronometro(indice, false);
+    }
+
     // Inverte true para false e false para true.
     disciplina.concluida = !disciplina.concluida;
 
-    // Salva a alteração para que ela sobreviva ao F5.
+    // Uma disciplina concluída não pode iniciar o cronômetro.
     salvarDisciplinas();
     renderizarDisciplinas();
 }
@@ -167,12 +207,118 @@ function removerDisciplina(indice) {
         return;
     }
 
+    // Não deixa um cronômetro continuar apontando para uma disciplina removida.
+    if (cronometroAtivo && cronometroAtivo.indice === indice) {
+        pararCronometro(indice, false);
+    }
+
     // Remove o objeto do array.
     disciplinas.splice(indice, 1);
 
     // Persiste o array atualizado no localStorage.
     salvarDisciplinas();
     renderizarDisciplinas();
+}
+
+// ================================================================
+// CRONÔMETRO
+// ================================================================
+function iniciarCronometro(indice) {
+    const disciplina = disciplinas[indice];
+
+    if (!disciplina) {
+        return;
+    }
+
+    // Regra de negócio: cronômetro disponível somente para tarefas abertas.
+    if (disciplina.concluida) {
+        mostrarMensagem(`Reabra "${disciplina.nome}" para iniciar o cronômetro.`, "erro");
+        return;
+    }
+
+    if (cronometroAtivo) {
+        mostrarMensagem("Pare o cronômetro atual antes de iniciar outro.", "erro");
+        return;
+    }
+
+    cronometroAtivo = {
+        indice: indice,
+        inicio: Date.now(),
+        segundosAcumulados: obterTempoSalvoEmSegundos(disciplina)
+    };
+
+    atualizarCronometroNaTela();
+    intervaloCronometro = setInterval(atualizarCronometroNaTela, 1000);
+    renderizarDisciplinas();
+}
+
+function obterSegundosDecorridos() {
+    if (!cronometroAtivo) {
+        return 0;
+    }
+
+    const segundosDaSessao = Math.max(0, Math.floor((Date.now() - cronometroAtivo.inicio) / 1000));
+    return cronometroAtivo.segundosAcumulados + segundosDaSessao;
+}
+
+function atualizarCronometroNaTela() {
+    if (!cronometroAtivo) {
+        return;
+    }
+
+    const display = document.querySelector(`[data-cronometro="${cronometroAtivo.indice}"]`);
+
+    if (!display) {
+        return;
+    }
+
+    display.textContent = formatarTempo(obterSegundosDecorridos());
+}
+
+function pararCronometro(indice, exibirMensagem = true) {
+    if (!cronometroAtivo || cronometroAtivo.indice !== indice) {
+        return;
+    }
+
+    const segundos = obterSegundosDecorridos();
+    const disciplina = disciplinas[indice];
+
+    clearInterval(intervaloCronometro);
+    intervaloCronometro = null;
+
+    cronometroAtivo = null;
+
+    if (disciplina) {
+        // Salva o tempo acumulado: ao iniciar novamente, o cronômetro continua
+        // exatamente do ponto em que foi parado anteriormente.
+        disciplina.tempoCronometroSegundos = segundos;
+
+        // O tempo estudado representa o tempo real acumulado pelo cronômetro.
+        // O tempo planejado permanece intacto.
+        disciplina.horasEstudadas = Number((segundos / 3600).toFixed(4));
+
+        // O cronômetro não conclui a disciplina automaticamente.
+        salvarDisciplinas();
+    }
+
+    renderizarDisciplinas();
+
+    if (exibirMensagem && disciplina) {
+        mostrarMensagem(`Tempo registrado em "${disciplina.nome}": ${formatarTempo(segundos)}.`, "sucesso");
+    }
+}
+
+function formatarTempo(segundos) {
+    const totalSegundos = Math.max(0, Math.floor(Number(segundos) || 0));
+    const horas = Math.floor(totalSegundos / 3600);
+    const minutos = Math.floor((totalSegundos % 3600) / 60);
+    const segundosRestantes = totalSegundos % 60;
+
+    return [horas, minutos, segundosRestantes]
+        .map(function (valor) {
+            return String(valor).padStart(2, "0");
+        })
+        .join(":");
 }
 
 // ================================================================
@@ -199,8 +345,11 @@ function renderizarDisciplinas() {
         const dados = document.createElement("div");
         dados.className = "dados-disciplina";
 
-        const horas = document.createElement("span");
-        horas.textContent = `Horas estudadas: ${formatarHoras(disciplina.horasEstudadas)}`;
+        const tempoPlanejado = document.createElement("span");
+        tempoPlanejado.textContent = `Planejado: ${formatarHorasPlanejadas(disciplina.horasPlanejadas)}`;
+
+        const tempoEstudado = document.createElement("span");
+        tempoEstudado.textContent = `Estudado: ${formatarTempo(obterTempoSalvoEmSegundos(disciplina))}`;
 
         const separador = document.createElement("span");
         separador.className = "separador";
@@ -212,11 +361,65 @@ function renderizarDisciplinas() {
         status.classList.add(disciplina.concluida ? "concluida" : "andamento");
         status.textContent = disciplina.concluida ? "Concluída" : "Em andamento";
 
-        dados.append(horas, separador, status);
+        dados.append(tempoPlanejado, separador, tempoEstudado, separador.cloneNode(true), status);
         info.append(nome, dados);
+
+        const cronometro = document.createElement("div");
+        cronometro.className = "area-cronometro";
+
+        const cronometroLabel = document.createElement("span");
+        cronometroLabel.className = "rotulo-cronometro";
+        cronometroLabel.textContent = cronometroAtivo && cronometroAtivo.indice === indice
+            ? "Estudando agora"
+            : "Cronômetro";
+
+        const cronometroDisplay = document.createElement("strong");
+        cronometroDisplay.className = "cronometro-display";
+        cronometroDisplay.dataset.cronometro = String(indice);
+        cronometroDisplay.textContent = cronometroAtivo && cronometroAtivo.indice === indice
+            ? formatarTempo(obterSegundosDecorridos())
+            : formatarTempo(obterTempoSalvoEmSegundos(disciplina));
+
+        cronometro.append(cronometroLabel, cronometroDisplay);
 
         const acoes = document.createElement("div");
         acoes.className = "acoes";
+
+        const botaoCronometro = document.createElement("button");
+        botaoCronometro.type = "button";
+        const cronometroRodando = cronometroAtivo && cronometroAtivo.indice === indice;
+        const cronometroDisponivel = !disciplina.concluida;
+
+        if (cronometroRodando) {
+            botaoCronometro.className = "botao-cronometro parando";
+            botaoCronometro.textContent = "Parar cronômetro";
+            botaoCronometro.disabled = false;
+            botaoCronometro.setAttribute("aria-label", `Parar cronômetro de ${disciplina.nome}`);
+        } else if (!cronometroDisponivel) {
+            botaoCronometro.className = "botao-cronometro indisponivel";
+            botaoCronometro.textContent = "Iniciar Cronômetro";
+            botaoCronometro.disabled = true;
+            botaoCronometro.setAttribute("aria-label", `Cronômetro indisponível para ${disciplina.nome}. Reabra a disciplina para iniciar.`);
+            botaoCronometro.title = "Reabra a disciplina para iniciar o cronômetro";
+        } else {
+            botaoCronometro.className = "botao-cronometro";
+            botaoCronometro.textContent = "Iniciar cronômetro";
+            botaoCronometro.disabled = false;
+            botaoCronometro.setAttribute("aria-label", `Iniciar cronômetro de ${disciplina.nome}`);
+            botaoCronometro.removeAttribute("title");
+        }
+
+        botaoCronometro.addEventListener("click", function () {
+            if (botaoCronometro.disabled) {
+                return;
+            }
+
+            if (cronometroAtivo && cronometroAtivo.indice === indice) {
+                pararCronometro(indice);
+            } else {
+                iniciarCronometro(indice);
+            }
+        });
 
         const botaoConclusao = document.createElement("button");
         botaoConclusao.type = "button";
@@ -234,13 +437,14 @@ function renderizarDisciplinas() {
             removerDisciplina(indice);
         });
 
-        acoes.append(botaoConclusao, botaoRemover);
-        card.append(info, acoes);
+        acoes.append(botaoCronometro, botaoConclusao, botaoRemover);
+        card.append(info, cronometro, acoes);
         listaDisciplinas.appendChild(card);
     });
 
     estadoVazio.hidden = disciplinas.length !== 0;
     atualizarResumo();
+    atualizarCronometroNaTela();
 }
 
 // ================================================================
@@ -251,27 +455,46 @@ function atualizarResumo() {
         return disciplina.concluida;
     }).length;
 
-    const quantidadeHoras = disciplinas.reduce(function (total, disciplina) {
-        return total + Number(disciplina.horasEstudadas);
-    }, 0);
-
     totalDisciplinas.textContent = disciplinas.length;
     totalConcluidas.textContent = quantidadeConcluidas;
-    totalHoras.textContent = `${formatarNumero(quantidadeHoras)}h`;
+    const totalSegundos = disciplinas.reduce(function (total, disciplina) {
+        return total + obterTempoSalvoEmSegundos(disciplina);
+    }, 0);
+
+    totalHoras.textContent = formatarTempo(totalSegundos);
     contadorStatus.textContent = `${disciplinas.length} ${disciplinas.length === 1 ? "disciplina" : "disciplinas"}`;
 }
 
 // ================================================================
 // AUXILIARES DE INTERFACE
 // ================================================================
+function obterTempoSalvoEmSegundos(disciplina) {
+    if (!disciplina) {
+        return 0;
+    }
+
+    if (Number(disciplina.tempoCronometroSegundos) > 0) {
+        return Number(disciplina.tempoCronometroSegundos);
+    }
+
+    return Math.max(0, Math.round((Number(disciplina.horasEstudadas) || 0) * 3600));
+}
+
+function formatarHorasPlanejadas(horas) {
+    const valor = Number(horas) || 0;
+    const segundos = Math.round(valor * 3600);
+    return formatarTempo(segundos);
+}
+
 function formatarNumero(numero) {
-    return Number.isInteger(numero)
-        ? String(numero)
-        : numero.toFixed(1).replace(".0", "");
+    const valor = Number(numero) || 0;
+    return Number.isInteger(valor)
+        ? String(valor)
+        : valor.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function formatarHoras(horas) {
-    const numero = Number(horas);
+    const numero = Number(horas) || 0;
     return `${formatarNumero(numero)}h`;
 }
 

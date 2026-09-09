@@ -478,3 +478,109 @@ body, .painel, .estatistica, .card-disciplina, .botao-secundario, .botao-remover
     border-color 0.25s ease,
     box-shadow 0.25s ease;
 }
+
+.texto-apoio {
+    margin: 7px 0 0;
+    color: var(--texto-secundario);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.card-disciplina {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, auto) minmax(220px, auto);
+}
+
+.area-cronometro {
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    min-width: 150px;
+    padding: 10px 16px;
+    border: 1px solid var(--borda);
+    border-radius: 12px;
+    background: var(--superficie);
+}
+
+.rotulo-cronometro {
+    color: var(--texto-secundario);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.cronometro-display {
+    margin-top: 3px;
+    font-variant-numeric: tabular-nums;
+    font-size: 1.18rem;
+    letter-spacing: 0.04em;
+}
+
+.botao-cronometro {
+    min-height: 40px;
+    padding: 0 13px;
+    border: 1px solid var(--primaria);
+    border-radius: 10px;
+    background: var(--primaria);
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.botao-cronometro:hover {
+    background: var(--primaria-escura);
+}
+
+.botao-cronometro.parando {
+    background: #c62828;
+    border-color: #c62828;
+    box-shadow: 0 8px 20px rgba(198, 40, 40, 0.22);
+}
+
+.botao-cronometro.parando:hover {
+    background: #a91f1f;
+    border-color: #a91f1f;
+}
+
+body.tema-escuro .area-cronometro {
+    background: #121b2c;
+}
+
+.botao-cronometro.indisponivel,
+.botao-cronometro.indisponivel:hover {
+    background: #e5e7eb;
+    border-color: #d1d5db;
+    color: #9ca3af;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.9;
+}
+
+body.tema-escuro .botao-cronometro.indisponivel,
+body.tema-escuro .botao-cronometro.indisponivel:hover {
+    background: #2b3342;
+    border-color: #3a465a;
+    color: #7f8999;
+}
+
+.botao-cronometro:disabled {
+    pointer-events: none;
+}
+
+@media (max-width: 930px) {
+    .card-disciplina {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .area-cronometro {
+        grid-column: 1 / -1;
+        justify-self: start;
+    }
+}
+
+@media (max-width: 780px) {
+    .area-cronometro {
+        width: 100%;
+        justify-self: stretch;
+    }
+}

@@ -10,9 +10,9 @@
     <header class="cabecalho">
         <div class="container cabecalho-conteudo">
             <div>
-            <p class="eyebrow">Organização acadêmica</p>
-            <h1>Sistema de Controle de Estudos</h1>
-            <p class="subtitulo">Cadastre suas disciplinas, acompanhe as horas estudadas e mantenha tudo salvo no navegador.</p>
+                <p class="eyebrow">Organização acadêmica</p>
+                <h1>Sistema de Controle de Estudos</h1>
+                <p class="subtitulo">Cadastre suas disciplinas, acompanhe o tempo real de estudo e mantenha tudo salvo no navegador.</p>
             </div>
             <button id="botao-tema" class="botao-tema" type="button" aria-label="Ativar tema escuro" title="Ativar tema escuro">🌙 <span>Tema escuro</span></button>
         </div>
@@ -23,6 +23,7 @@
             <div class="titulo-secao">
                 <div>
                     <h2 id="titulo-cadastro">Cadastrar disciplina</h2>
+                    <p class="texto-apoio">Defina uma meta de estudo. O cronômetro registrará separadamente o tempo realmente estudado.</p>
                 </div>
             </div>
 
@@ -41,7 +42,7 @@
                 </div>
 
                 <div class="campo">
-                    <label for="horas-estudadas">Horas estudadas</label>
+                    <label for="horas-estudadas">Tempo planejado de estudo (horas)</label>
                     <input
                         id="horas-estudadas"
                         name="horas"
@@ -68,8 +69,8 @@
                 <strong id="total-concluidas">0</strong>
             </article>
             <article class="estatistica">
-                <span class="rotulo-estatistica">Horas estudadas</span>
-                <strong id="total-horas">0h</strong>
+                <span class="rotulo-estatistica">Tempo estudado</span>
+                <strong id="total-horas">00:00:00</strong>
             </article>
         </section>
 
@@ -77,6 +78,7 @@
             <div class="cabecalho-lista">
                 <div>
                     <h2 id="titulo-lista">Minhas disciplinas</h2>
+                    <p class="texto-apoio">A meta e o tempo realmente estudado são mantidos separados.</p>
                 </div>
                 <span id="contador-status" class="contador-status">0 disciplinas</span>
             </div>
